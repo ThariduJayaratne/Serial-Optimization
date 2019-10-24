@@ -1,5 +1,5 @@
 #!/bin/bash
-make
+module load languages/intel
+make -B
 sbatch stencil.job
-sleep 10s
-nano stencil.out
+
