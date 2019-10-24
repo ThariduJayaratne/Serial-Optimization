@@ -1,1 +1,4 @@
-module load icc/2017.1.132-GCC-5.4.0-2.26
+#!/bin/bash
+module load languages/intel
+make -B
+sbatch stencil.job
