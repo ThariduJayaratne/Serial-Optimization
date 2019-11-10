@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include "mpi.h"
+
+#define NROWS 4
+#define NCOLS 16
+#define MASTER 0
+
+int calc_ncols_from_rank(int rank, int size);
 
 // Define output file name
 #define OUTPUT_FILE "stencil.pgm"
@@ -15,10 +22,34 @@ double wtime(void);
 
 int main(int argc, char* argv[])
 {
+  int ii,jj;             /* row and column indices for the grid */
+  int kk;                /* index for looping over ranks */
+  int rank;              /* the rank of this process */
+  int left;              /* the rank of the process to the left */
+  int right;             /* the rank of the process to the right */
+  int size;              /* number of processes in the communicator */
+  int tag = 0;           /* scope for adding extra information to a message */
+  MPI_Status status;     /* struct used by MPI_Recv */
+  int local_nrows;       /* number of rows apportioned to this rank */
+  int local_ncols;       /* number of columns apportioned to this rank */
   // Check usage
   if (argc != 4) {
     fprintf(stderr, "Usage: %s nx ny niters\n", argv[0]);
     exit(EXIT_FAILURE);
+  }
+
+  MPI_Init( &argc, &argv );
+  MPI_Comm_size( MPI_COMM_WORLD, &size );
+  MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+
+  left = (rank == MASTER) ? (rank + size - 1) : (rank - 1);
+  right = (rank + 1) % size;
+
+  local_nrows = NROWS;
+  local_ncols = calc_ncols_from_rank(rank, size);
+  if (local_ncols < 1) {
+    fprintf(stderr,"Error: too many processes:- local_ncols < 1\n");
+    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
   }
 
   // Initiliase problem dimensions from command line arguments
@@ -34,6 +65,8 @@ int main(int argc, char* argv[])
   // Allocate the image
   float* image = malloc(sizeof(double) * width * height);
   float* tmp_image = malloc(sizeof(double) * width * height);
+  double* sendbuf  = malloc(sizeof(double) * local_nrows);
+  double* recvbuf  = malloc(sizeof(double) * local_nrows);
 
   // Set the input image
   init_image(nx, ny, width, height, image, tmp_image);
@@ -138,4 +171,3 @@ double wtime(void)
   gettimeofday(&tv, NULL);
   return tv.tv_sec + tv.tv_usec * 1e-6;
 }
-
